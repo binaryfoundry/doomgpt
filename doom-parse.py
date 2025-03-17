@@ -163,6 +163,88 @@ def read_origin(things):
 
     return origin
 
+def compute_sector_polygon(map_obj, sector_index):
+    """
+    Reconstructs a closed polygon for the given sector by gathering
+    all edges (from linedefs whose sidedef references match the sector).
+    """
+    segments = []
+    for ld in map_obj.linedefs:
+        # Check the front sidedef (side0)
+        if ld.side0 != -1 and map_obj.sidedefs[ld.side0].sector == sector_index:
+            v0 = map_obj.vertices[ld.v0]
+            v1 = map_obj.vertices[ld.v1]
+            segments.append(((v0.x, v0.y), (v1.x, v1.y)))
+        # Check the back sidedef (side1)
+        if ld.side1 != -1 and map_obj.sidedefs[ld.side1].sector == sector_index:
+            # Reverse the order so the edge is oriented consistently
+            v0 = map_obj.vertices[ld.v1]
+            v1 = map_obj.vertices[ld.v0]
+            segments.append(((v0.x, v0.y), (v1.x, v1.y)))
+
+    if not segments:
+        return None
+
+    # Order segments into a continuous polygon.
+    # Start with the first segment.
+    polygon = list(segments.pop(0))
+    changed = True
+    while segments and changed:
+        changed = False
+        for seg in segments:
+            if seg[0] == polygon[-1]:
+                polygon.append(seg[1])
+                segments.remove(seg)
+                changed = True
+                break
+            elif seg[1] == polygon[-1]:
+                polygon.append(seg[0])
+                segments.remove(seg)
+                changed = True
+                break
+            elif seg[0] == polygon[0]:
+                polygon.insert(0, seg[1])
+                segments.remove(seg)
+                changed = True
+                break
+            elif seg[1] == polygon[0]:
+                polygon.insert(0, seg[0])
+                segments.remove(seg)
+                changed = True
+                break
+    # Ensure the polygon is closed.
+    if polygon[0] != polygon[-1]:
+        polygon.append(polygon[0])
+    return [Vertex(x, y) for (x, y) in polygon]
+
+def point_in_polygon(x, y, polygon):
+    """
+    Determines if the point (x, y) is inside the polygon.
+    Uses a ray-casting algorithm.
+    """
+    inside = False
+    n = len(polygon)
+    j = n - 1
+    for i in range(n):
+        xi, yi = polygon[i].x, polygon[i].y
+        xj, yj = polygon[j].x, polygon[j].y
+        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+def find_sector_for_point(map_obj, x, y):
+    """
+    Iterates over all sectors in the map and returns the sector
+    whose reconstructed polygon contains the point (x, y).
+    If no sector contains the point, returns None.
+    """
+    for sector_index, sector in enumerate(map_obj.sectors):
+        polygon = compute_sector_polygon(map_obj, sector_index)
+        if polygon and point_in_polygon(x, y, polygon):
+            return sector_index
+    return None
+
 def write_wad(wad, maps):
     for map_obj in maps:
         map_data = omg.MapEditor()
@@ -224,6 +306,12 @@ for filename in os.listdir(input_dir):
             ))
 
 print(len(maps))
+
+# Find and print the sector that contains the origin of the first map
+if maps:
+    test_point = maps[0].origin  # using the origin thing as an example point
+    sector = find_sector_for_point(maps[0], test_point.x, test_point.y)
+    print("Sector at origin:", sector)
 
 wad = omg.WAD()
 write_wad(wad, maps[:2])
