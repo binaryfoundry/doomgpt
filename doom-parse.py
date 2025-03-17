@@ -59,6 +59,9 @@ class Map:
     things: list[Thing]
     origin: Vertex
 
+# -------------------------------------------------------------------
+# Map data parsing
+
 def read_vertices(name_group):
     if "VERTEXES" not in name_group:
         raise KeyError("VERTEXES lump not found in the NameGroup.")
@@ -163,6 +166,9 @@ def read_origin(things):
 
     return origin
 
+# -------------------------------------------------------------------
+# Sector lookup functions
+
 def compute_sector_polygon(map_obj, sector_index):
     """
     Reconstructs a closed polygon for the given sector by gathering
@@ -245,6 +251,9 @@ def find_sector_for_point(map_obj, x, y):
             return sector_index
     return None
 
+# -------------------------------------------------------------------
+# DFS of sectors
+
 def get_sector_neighbors(map_obj):
     """
     Constructs a dictionary mapping each sector index to a set of adjacent sector indices.
@@ -286,6 +295,9 @@ def traverse_sectors(doom_map):
     print("Sector at origin:", start_sector_index)
     visit_order = dfs_sectors(doom_map, start_sector_index)
     print(visit_order)
+
+# -------------------------------------------------------------------
+# Main script: Load maps and write a new wad
 
 def write_wad(wad, maps):
     for map_obj in maps:
