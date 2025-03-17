@@ -245,6 +245,48 @@ def find_sector_for_point(map_obj, x, y):
             return sector_index
     return None
 
+def get_sector_neighbors(map_obj):
+    """
+    Constructs a dictionary mapping each sector index to a set of adjacent sector indices.
+    Two sectors are considered adjacent if a linedef connects them (i.e., if the linedef
+    has both a front and a back sidedef and they reference different sectors).
+    """
+    adjacency = {i: set() for i in range(len(map_obj.sectors))}
+    for ld in map_obj.linedefs:
+        if ld.side0 != -1 and ld.side1 != -1:
+            sector_a = map_obj.sidedefs[ld.side0].sector
+            sector_b = map_obj.sidedefs[ld.side1].sector
+            if sector_a != sector_b:
+                adjacency[sector_a].add(sector_b)
+                adjacency[sector_b].add(sector_a)
+    return adjacency
+
+def dfs_sectors(map_obj, start_sector_index):
+    """
+    Performs a Depth-First Search (DFS) starting from the given sector index and
+    returns a list of sector indices in the order they were visited.
+    """
+    adjacency = get_sector_neighbors(map_obj)
+    visited = set()
+    visit_order = []  # List to record the order of visited sectors.
+    stack = [start_sector_index]
+    while stack:
+        current = stack.pop()
+        if current in visited:
+            continue
+        visited.add(current)
+        visit_order.append(current)
+        for neighbor in adjacency.get(current, []):
+            if neighbor not in visited:
+                stack.append(neighbor)
+    return visit_order
+
+def traverse_sectors(doom_map):
+    start_sector_index = find_sector_for_point(doom_map, doom_map.origin.x, doom_map.origin.y)
+    print("Sector at origin:", start_sector_index)
+    visit_order = dfs_sectors(doom_map, start_sector_index)
+    print(visit_order)
+
 def write_wad(wad, maps):
     for map_obj in maps:
         map_data = omg.MapEditor()
@@ -307,11 +349,7 @@ for filename in os.listdir(input_dir):
 
 print(len(maps))
 
-# Find and print the sector that contains the origin of the first map
-if maps:
-    test_point = maps[0].origin  # using the origin thing as an example point
-    sector = find_sector_for_point(maps[0], test_point.x, test_point.y)
-    print("Sector at origin:", sector)
+traverse_sectors(maps[0])
 
 wad = omg.WAD()
 write_wad(wad, maps[:2])
